@@ -1409,26 +1409,26 @@ function expandUnits() {
 }
 
 /* ---- 회전 배치 판단 ---- */
-// freeRotate=false: 표기된 방향 그대로(가로·세로만 90도 돌려서 넣는 것은 항상 허용).
-// freeRotate=true: 세 변 중 어느 면을 바닥에 놓아도 되는 화물 — 어느 면이 바닥/높이가 되어도 되므로
-// 3가지 "어느 축을 높이로 쓸지" 후보를 모두 만든다(가로·세로 맞바꾸는 것은 아래에서 별도로 처리).
-function unitOrientations(l, w, h, freeRotate) {
-  if (!freeRotate) return [{ height: h, footL: l, footW: w, rotated: false }];
-  return [
-    { height: h, footL: l, footW: w, rotated: false },
-    { height: w, footL: l, footW: h, rotated: true },
-    { height: l, footL: w, footW: h, rotated: true },
-  ];
+// 클라이언트 피드백: 화물을 눕혀서 다른 면을 바닥에 대는 것(높이 자체가 바뀌는 회전)은 실제
+// 현장에서 위험하거나 불가능한 경우가 많아 지원하지 않는다. 회전은 항상 "옆으로만" —
+// 즉 높이는 등록된 값 그대로 고정하고, 바닥의 길이축↔폭축만 90도로 맞바꾸는 것만 허용한다.
+// (예전에는 freeRotate=true일 때 세 변 중 어느 면이든 바닥/높이가 될 수 있다고 보고 3가지
+// 후보를 만들었으나, 이 동작은 완전히 제거했다. 아래에서 항상 후보 1개만 돌려주며, l/w를
+// 실제로 맞바꿀지 여부는 footprintCombos()가 별도로 판단한다.)
+function unitOrientations(l, w, h) {
+  return [{ height: h, footL: l, footW: w }];
 }
-// 가로·세로를 맞바꿔서(길이축↔폭축) 배치하는 것도 "회전 적재 허용"을 껐으면 시도하지 않는다.
-// (실무에서는 화물 방향이 이미 고정된 경우가 많아 — 예: 이 방향으로만 지게차/크레인 작업이
-// 가능한 장비 — 끄면 등록된 길이·폭 그대로만 배치를 시도한다. 높이 방향 눕히기는 이 설정과
-// 별개로 freeRotate 값에 따라 unitOrientations()에서 이미 걸러진다.)
+// 가로·세로를 맞바꿔서(길이축↔폭축) 배치하는 것 — 유일하게 남은 회전 방식. "회전 적재 허용"을
+// 껐으면 이것도 시도하지 않는다(등록된 길이·폭 그대로만 배치 시도). 길이와 폭이 같은 화물은
+// 맞바꿔도 결과가 같으므로 이 설정과 무관하게 그대로 둔다.
 function footprintCombos(footL, footW) {
   if (footL === footW) return [[footL, footW]];
   if (!calcRotateAllowed) return [[footL, footW]];
   return [[footL, footW], [footW, footL]];
 }
+// footprintCombos가 돌려준 (l, w)가 원래 방향(footL, footW) 그대로인지, 맞바꿔진 것인지 판정.
+// 배치 결과에 "↻ 회전배치"를 정확히 표시하기 위해 쓰인다.
+function isSwapped(l, w, footL, footW) { return !(l === footL && w === footW); }
 
 function fitsEnvelope(u, spec) {
   return unitOrientations(u.l, u.w, u.h, u.freeRotate).some(
@@ -1459,13 +1459,14 @@ function classifyUnits(units) {
 function matchOrientPair(oa, ob) {
   const combos = [];
   footprintCombos(oa.footL, oa.footW).forEach(([al, aw]) => footprintCombos(ob.footL, ob.footW).forEach(([bl, bw]) => combos.push([al, aw, bl, bw])));
+  const withRotFlags = (al, aw, bl, bw) => ({ aRotated: isSwapped(al, aw, oa.footL, oa.footW), bRotated: isSwapped(bl, bw, ob.footL, ob.footW) });
   for (const [al, aw, bl, bw] of combos) {
-    if (Math.abs(al - bl) < EPS && Math.abs(aw - bw) < EPS) return { type: "exact", footprint: [Math.max(al, bl), Math.max(aw, bw)] };
+    if (Math.abs(al - bl) < EPS && Math.abs(aw - bw) < EPS) return { type: "exact", footprint: [Math.max(al, bl), Math.max(aw, bw)], ...withRotFlags(al, aw, bl, bw) };
   }
   for (const [al, aw, bl, bw] of combos) {
     const lMatch = Math.abs(al - bl) < EPS, wMatch = Math.abs(aw - bw) < EPS;
-    if (lMatch) return { type: "partial", footprint: [Math.max(al, bl), Math.max(aw, bw)], detail: `길이 일치(${fmtNum(al)}mm), 폭 상이(${fmtNum(aw)} / ${fmtNum(bw)}mm)` };
-    if (wMatch) return { type: "partial", footprint: [Math.max(al, bl), Math.max(aw, bw)], detail: `폭 일치(${fmtNum(aw)}mm), 길이 상이(${fmtNum(al)} / ${fmtNum(bl)}mm)` };
+    if (lMatch) return { type: "partial", footprint: [Math.max(al, bl), Math.max(aw, bw)], detail: `길이 일치(${fmtNum(al)}mm), 폭 상이(${fmtNum(aw)} / ${fmtNum(bw)}mm)`, ...withRotFlags(al, aw, bl, bw) };
+    if (wMatch) return { type: "partial", footprint: [Math.max(al, bl), Math.max(aw, bw)], detail: `폭 일치(${fmtNum(aw)}mm), 길이 상이(${fmtNum(al)} / ${fmtNum(bl)}mm)`, ...withRotFlags(al, aw, bl, bw) };
   }
   return null;
 }
@@ -1497,8 +1498,9 @@ function bestFootprintMatch(a, b, heightLimit) {
   return bestExact || bestPartial || null;
 }
 
-function rotationNote(orient, item) {
-  return orient.rotated ? `${item.desc} 회전배치(바닥 ${fmtNum(orient.footL)}×${fmtNum(orient.footW)}mm, 높이 ${fmtNum(orient.height)}mm)` : null;
+// rotated=true면 실제로 가로·세로가 맞바뀐 상태이므로, 표시도 맞바뀐 치수(footW×footL)로 보여준다.
+function rotationNote(orient, item, rotated) {
+  return rotated ? `${item.desc} 회전배치(바닥 ${fmtNum(orient.footW)}×${fmtNum(orient.footL)}mm, 높이 ${fmtNum(orient.height)}mm)` : null;
 }
 
 function buildStackPairs(standardUnits, heightLimit) {
@@ -1525,11 +1527,13 @@ function buildStackPairs(standardUnits, heightLimit) {
       const top = bottom === a ? b : a;
       const bottomOrient = bottom === a ? best.oa : best.ob;
       const topOrient = bottom === a ? best.ob : best.oa;
-      const rotationNotes = [rotationNote(bottomOrient, bottom), rotationNote(topOrient, top)].filter(Boolean);
+      const bottomRotated = bottom === a ? best.aRotated : best.bRotated;
+      const topRotated = bottom === a ? best.bRotated : best.aRotated;
+      const rotationNotes = [rotationNote(bottomOrient, bottom, bottomRotated), rotationNote(topOrient, top, topRotated)].filter(Boolean);
       const pair = {
         id: uid("pair"), bottom, top, matchType: best.type,
         footprint: best.footprint, combinedHeight: bottomOrient.height + topOrient.height, combinedWeight: bottom.weight + top.weight,
-        bottomOrient, topOrient,
+        bottomOrient, topOrient, bottomRotated, topRotated,
         reason: (best.type === "exact" ? "가로·세로 모두 동일" : (best.detail || "한 변만 일치")) + (rotationNotes.length ? ` · ${rotationNotes.join(", ")}` : ""),
       };
       if (best.type === "exact") autoPairs.push(pair); else discretionary.push(pair);
@@ -1594,7 +1598,7 @@ function renderReview() {
   if (autoPairs.length) {
     html += `<h3>자동 확정된 2단 조합</h3><table><thead><tr><th>아래(중량 큼)</th><th>위(중량 작음)</th><th>결합높이</th><th>결합중량</th><th>비고</th></tr></thead><tbody>`;
     html += autoPairs.map((p) => {
-      const rotated = (p.bottomOrient && p.bottomOrient.rotated) || (p.topOrient && p.topOrient.rotated);
+      const rotated = p.bottomRotated || p.topRotated;
       return `<tr><td>${escapeHtml(p.bottom.desc)}</td><td>${escapeHtml(p.top.desc)}</td><td>${fmtNum(p.combinedHeight)}mm</td><td>${fmtNum(p.combinedWeight)}kg</td><td>${rotated ? '<span class="badge discretionary">↻ 회전배치 적용</span>' : ""}</td></tr>`;
     }).join("");
     html += "</tbody></table>";
@@ -1652,7 +1656,7 @@ function findPlacement(bin, u) {
         if (l <= r.w + EPS && w <= r.h + EPS) {
           const leftover = r.w * r.h - l * w;
           if (!best || leftover < best.leftover - EPS) {
-            best = { rectIndex: ri, x: r.x, y: r.y, l, w, height: o.height, rotated: o.rotated, leftover };
+            best = { rectIndex: ri, x: r.x, y: r.y, l, w, height: o.height, rotated: isSwapped(l, w, o.footL, o.footW), leftover };
           }
         }
       }
@@ -1699,7 +1703,7 @@ function findPlacementFR(bin, u) {
           if (row.isWide) continue; // 오버행 화물이 독점한 행에는 아무것도 못 붙임
           if (l > row.length + EPS) continue; // 이 행의 길이(=행을 연 화물의 길이)보다 길면 못 들어감
           if (row.widthUsed + w > FR_DECK_W + EPS) continue;
-          return { rowIndex: ri, newRow: false, l, w, height: o.height, rotated: o.rotated };
+          return { rowIndex: ri, newRow: false, l, w, height: o.height, rotated: isSwapped(l, w, o.footL, o.footW) };
         }
       }
 
@@ -1707,7 +1711,7 @@ function findPlacementFR(bin, u) {
       const remainingLength = bin.spec.L - bin.usedLength;
       if (l <= remainingLength + EPS) {
         return {
-          rowIndex: -1, newRow: true, isWide, l, w, height: o.height, rotated: o.rotated,
+          rowIndex: -1, newRow: true, isWide, l, w, height: o.height, rotated: isSwapped(l, w, o.footL, o.footW),
           rowLength: l, widthBudget: isWide ? bin.spec.W : FR_DECK_W,
         };
       }
@@ -1916,8 +1920,15 @@ function runStep2() {
   const loadUnits = [];
   confirmedPairs.forEach((p) => {
     // 2단 조합은 확정 시점의 방향(회전 여부 포함)이 이미 고정된다 — 컨테이너에 넣을 때 다시 눕히지 않는다.
-    const bottomItem = { ...p.bottom, placedL: p.bottomOrient.footL, placedW: p.bottomOrient.footW, placedH: p.bottomOrient.height, rotated: p.bottomOrient.rotated };
-    const topItem = { ...p.top, placedL: p.topOrient.footL, placedW: p.topOrient.footW, placedH: p.topOrient.height, rotated: p.topOrient.rotated };
+    // rotated면 실제 바닥에 놓인 방향은 footW×footL(맞바뀐 상태)이다.
+    const bottomItem = { ...p.bottom,
+      placedL: p.bottomRotated ? p.bottomOrient.footW : p.bottomOrient.footL,
+      placedW: p.bottomRotated ? p.bottomOrient.footL : p.bottomOrient.footW,
+      placedH: p.bottomOrient.height, rotated: p.bottomRotated };
+    const topItem = { ...p.top,
+      placedL: p.topRotated ? p.topOrient.footW : p.topOrient.footL,
+      placedW: p.topRotated ? p.topOrient.footL : p.topOrient.footW,
+      placedH: p.topOrient.height, rotated: p.topRotated };
     loadUnits.push({
       orientations: [{ height: p.combinedHeight, footL: p.footprint[0], footW: p.footprint[1], rotated: false }],
       weight: p.combinedWeight, tier: "2단", items: [bottomItem, topItem], desc: `${p.bottom.desc} + ${p.top.desc}`,
@@ -2102,6 +2113,22 @@ function placementNoLabel(pl) {
   return (pl.items || []).map((it) => it.no).filter((n) => n !== null && n !== undefined && n !== "").join("+");
 }
 
+// 2단 조합(pl.tier === "2단")은 위에서 내려다본 평면도에서는 아래·위 화물이 같은 바닥면을
+// 차지해 사각형 하나로만 보인다 — 텍스트로 "[2단]"이라고만 표시되면 한눈에 구분이 잘 안 된다는
+// 피드백을 반영해, 사각형을 대각선으로 반씩 나눠 아래 화물/위 화물 색을 각각 표시한다.
+// (왼쪽 아래 삼각형 = 아래 화물, 오른쪽 위 삼각형 = 위 화물. 대각선 자체도 굵은 선으로 그려
+// "여기는 2단"임이 색상만으로도 바로 보이게 한다.)
+function twoTierSplitSvg(x, y, w, h, bottomItem, topItem) {
+  const colorBottom = colorForDesc(bottomItem.desc);
+  const colorTop = colorForDesc(topItem.desc);
+  const x2 = x + w, y2 = y + h;
+  // 왼쪽 아래 삼각형(좌하·좌상·우하) = 아래 화물, 오른쪽 위 삼각형(좌상·우상·우하) = 위 화물
+  return `
+      <polygon points="${x},${y} ${x},${y2} ${x2},${y2}" fill="${colorBottom}" fill-opacity="0.75"/>
+      <polygon points="${x},${y} ${x2},${y} ${x2},${y2}" fill="${colorTop}" fill-opacity="0.75"/>
+      <line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="1.5"/>`;
+}
+
 function containerVizSvg(bin) {
   const scale = VIZ_SCALE;
   const svgW = Math.round(bin.spec.L * scale) + 20;
@@ -2109,13 +2136,21 @@ function containerVizSvg(bin) {
   let rects = "";
   bin.placements.forEach((pl) => {
     const x = 10 + pl.x * scale, y = 10 + pl.y * scale, w = pl.placedL * scale, h = pl.placedW * scale;
-    const color = colorForDesc(pl.desc);
+    const ww = Math.max(w - 2, 2), hh = Math.max(h - 2, 2);
     const rowRotated = pl.rotated || (pl.items && pl.items.some((it) => it.rotated));
     const noLabel = placementNoLabel(pl);
-    const label = (noLabel ? `No.${escapeHtml(noLabel)} ` : "") + (pl.tier === "2단" ? `${escapeHtml(pl.desc)} [2단]` : escapeHtml(pl.desc)) + (rowRotated ? " ↻" : "");
+    const isTwoTier = pl.tier === "2단" && pl.items && pl.items.length === 2;
+
+    let fillMarkup;
+    if (isTwoTier) {
+      fillMarkup = twoTierSplitSvg(x, y, ww, hh, pl.items[0], pl.items[1]);
+    } else {
+      fillMarkup = `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="${colorForDesc(pl.desc)}" fill-opacity="0.75" stroke="#fff" stroke-width="1"/>`;
+    }
+    const label = (noLabel ? `No.${escapeHtml(noLabel)} ` : "") + (isTwoTier ? `${escapeHtml(pl.desc)} [2단]` : escapeHtml(pl.desc)) + (rowRotated ? " ↻" : "");
     rects += `<g>
-      <rect x="${x}" y="${y}" width="${Math.max(w - 2, 2)}" height="${Math.max(h - 2, 2)}" fill="${color}" fill-opacity="0.75" stroke="#fff" stroke-width="1"/>
-      <text x="${x + w / 2}" y="${y + h / 2}" font-size="9" fill="#fff" text-anchor="middle" dominant-baseline="middle">${w > 40 ? label.slice(0, Math.floor(w / 6)) : ""}</text>
+      ${fillMarkup}
+      <text x="${x + ww / 2}" y="${y + hh / 2}" font-size="9" fill="#fff" text-anchor="middle" dominant-baseline="middle" stroke="#1F3864" stroke-width="2" paint-order="stroke">${w > 40 ? label.slice(0, Math.floor(w / 6)) : ""}</text>
     </g>`;
   });
   return `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
