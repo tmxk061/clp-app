@@ -4,176 +4,198 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CLP 적재 계산 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --navy:#1F3864;
-  --accent:#2E74B5;
-  --accent-light:#DDEBF7;
-  --grey-bg:#F5F6F8;
-  --border:#DCE1E8;
-  --text:#222;
-  --text-mute:#666;
-  --danger:#C0392B;
-  --warn:#B7791F;
-  --warn-bg:#FFF6E5;
-  --ok:#1E7E34;
-  --ok-bg:#EAF7EE;
-  font-family:"Malgun Gothic","맑은 고딕",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  /* 새 디자인 시스템 팔레트 (UI 시안과 통일) */
+  --ink:#16213C; --ink-soft:#56607A; --ink-faint:#8992A8;
+  --bg:#F5F6FA; --surface:#FFFFFF;
+  --primary:#2454D6; --primary-soft:#EAF0FD; --primary-soft-border:#C9D9FA;
+  --amber:#AD5E0A; --amber-soft:#FCF0DF; --amber-soft-border:#F0D4A6;
+  --green:#1C7A4D; --green-soft:#E7F6EE; --green-soft-border:#BCE4CE;
+  --red:#C23934; --red-soft:#FBEAE8;
+
+  /* 기존 코드 곳곳(JS가 만드는 inline style 포함)에서 쓰는 예전 변수명 — 값만 새 팔레트로 맞춘다 */
+  --navy:#16213C;
+  --accent:#2454D6;
+  --accent-light:#EAF0FD;
+  --grey-bg:#F5F6FA;
+  --border:#E3E6EE;
+  --text:#16213C;
+  --text-mute:#56607A;
+  --danger:#C23934;
+  --warn:#AD5E0A;
+  --warn-bg:#FCF0DF;
+  --ok:#1C7A4D;
+  --ok-bg:#E7F6EE;
+
+  font-family:"Noto Sans KR",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 *{box-sizing:border-box;}
-body{margin:0;background:var(--grey-bg);color:var(--text);font-size:14px;line-height:1.55;}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;}
 header.topbar{
-  background:var(--navy);color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;
+  background:var(--ink);color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
 }
-header.topbar h1{font-size:18px;margin:0;font-weight:700;}
-header.topbar .sub{font-size:12px;opacity:0.75;margin-top:2px;}
-nav.tabs{display:flex;gap:4px;background:#fff;padding:0 24px;border-bottom:1px solid var(--border);}
+header.topbar .brand{display:flex;align-items:center;gap:12px;}
+header.topbar .mark{width:34px;height:34px;border-radius:9px;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;color:#fff;}
+header.topbar h1{font-size:17px;margin:0;font-weight:700;}
+header.topbar .sub{font-size:11.5px;opacity:0.72;margin-top:2px;}
+nav.tabs{display:flex;gap:6px;background:#fff;padding:10px 28px;border-bottom:1px solid var(--border);}
 nav.tabs button{
-  border:none;background:transparent;padding:14px 20px;font-size:14px;cursor:pointer;color:var(--text-mute);
-  border-bottom:3px solid transparent;font-weight:600;
+  border:none;background:transparent;padding:9px 16px;font-size:13px;cursor:pointer;color:var(--ink-soft);
+  border-radius:999px;font-weight:700;
 }
-nav.tabs button.active{color:var(--navy);border-bottom-color:var(--accent);}
+nav.tabs button.active{color:#fff;background:var(--primary);}
 main{padding:24px 28px 60px;max-width:1320px;margin:0 auto;}
 .panel{display:none;}
 .panel.active{display:block;}
-.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:18px;}
-.card h2{font-size:16px;margin:0 0 4px;color:var(--navy);}
-.card h3{font-size:14px;margin:18px 0 8px;color:var(--navy);}
-.card .desc{font-size:12.5px;color:var(--text-mute);margin:0 0 14px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;margin-bottom:18px;}
+.card h2{font-size:16px;margin:0 0 6px;color:var(--ink);}
+.card h3{font-size:14px;margin:18px 0 8px;color:var(--ink);}
+.card .desc{font-size:12.5px;color:var(--ink-soft);margin:0 0 16px;line-height:1.6;}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
 .row.between{justify-content:space-between;}
-label.field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--text-mute);}
+label.field{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink-soft);font-weight:600;}
 label.field input, label.field select, label.field textarea{
-  border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:13px;font-family:inherit;
-  min-width:110px;background:#fff;color:var(--text);
+  border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;
+  min-width:110px;background:#fff;color:var(--ink);font-weight:400;
 }
 label.field textarea{min-width:220px;resize:vertical;}
 button{
-  cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;
-  padding:8px 16px;font-size:13px;font-weight:600;font-family:inherit;
+  cursor:pointer;border:none;background:var(--primary);color:#fff;border-radius:9px;
+  padding:9px 18px;font-size:13px;font-weight:700;font-family:inherit;
 }
-button.secondary{background:#fff;color:var(--accent);}
-button.ghost{background:transparent;color:var(--text-mute);border-color:var(--border);}
-button.danger{background:#fff;color:var(--danger);border-color:var(--danger);}
+button.secondary{background:#fff;color:var(--primary);border:1px solid var(--primary);}
+button.ghost{background:#fff;color:var(--ink-soft);border:1px solid var(--border);}
+button.danger{background:#fff;color:var(--red);border:1px solid var(--red);}
 button:disabled{opacity:0.45;cursor:not-allowed;}
-button.small{padding:4px 10px;font-size:12px;}
+button.small{padding:5px 12px;font-size:12px;}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
 table th{
-  background:var(--navy);color:#fff;text-align:left;padding:8px 9px;font-weight:600;white-space:nowrap;
+  background:var(--bg);color:var(--ink-soft);text-align:left;padding:9px 10px;font-weight:700;font-size:11.5px;white-space:nowrap;border-bottom:1.5px solid var(--border);
 }
-table td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:middle;}
-table tbody tr:hover{background:var(--accent-light);}
-.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;}
-.badge.wood{background:#EFE3D0;color:#8A5A00;}
-.badge.tent{background:#E3E9F5;color:#2A4B8D;}
-.badge.etc{background:#EAEAEA;color:#555;}
+table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+table tbody tr:hover{background:var(--primary-soft);}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;}
+.badge.wood{background:var(--amber-soft);color:var(--amber);}
+.badge.tent{background:var(--primary-soft);color:var(--primary);}
+.badge.etc{background:#EEF1F7;color:var(--ink-soft);}
 .badge.stack-ok{background:var(--ok-bg);color:var(--ok);}
-.badge.stack-no{background:#F5E6E6;color:var(--danger);}
+.badge.stack-no{background:var(--red-soft);color:var(--red);}
 .badge.auto{background:var(--ok-bg);color:var(--ok);}
 .badge.discretionary{background:var(--warn-bg);color:var(--warn);}
-.badge.single{background:#EEE;color:#555;}
-.badge.oversize{background:#FCE8E6;color:#B3261E;}
-.empty{color:var(--text-mute);font-size:12.5px;padding:20px 0;text-align:center;}
+.badge.single{background:#EEF1F7;color:var(--ink-soft);}
+.badge.oversize{background:var(--red-soft);color:var(--red);}
+.empty{color:var(--ink-soft);font-size:12.5px;padding:24px 0;text-align:center;}
 .upload-box{
-  border:2px dashed var(--border);border-radius:10px;padding:26px;text-align:center;color:var(--text-mute);
-  background:#FAFBFC;
+  border:2px dashed var(--border);border-radius:14px;padding:30px 24px;text-align:center;color:var(--ink-soft);
+  background:#FBFCFE;
 }
 .upload-box input{display:none;}
-.upload-box .browse{color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline;}
+.upload-box .browse{color:var(--primary);font-weight:700;cursor:pointer;text-decoration:underline;}
 .upload-box{cursor:pointer;transition:border-color .12s ease, background .12s ease;}
-.upload-box.drag{border-color:var(--accent);background:var(--accent-light);color:var(--navy);}
-.stepper{display:flex;gap:0;margin-bottom:18px;}
-.stepper .step{flex:1;text-align:center;padding:10px 6px;font-size:12.5px;color:var(--text-mute);border-bottom:3px solid var(--border);}
-.stepper .step.active{color:var(--navy);font-weight:700;border-bottom-color:var(--accent);}
-.stepper .step.done{color:var(--ok);border-bottom-color:var(--ok);}
-.pill-radio{display:flex;gap:8px;flex-wrap:wrap;}
+.upload-box.drag{border-color:var(--primary);background:var(--primary-soft);color:var(--ink);}
+.stepper{display:flex;gap:6px;margin-bottom:18px;}
+.stepper .step{flex:1;text-align:center;padding:10px 8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;border-radius:999px;background:#EEF1F7;}
+.stepper .step.active{color:#fff;font-weight:700;background:var(--primary);}
+.stepper .step.done{color:var(--green);background:var(--green-soft);}
+.pill-radio{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
 .pill-radio label{
-  border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px;
-  display:flex;flex-direction:column;gap:2px;min-width:180px;background:#fff;
+  border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 14px;cursor:pointer;font-size:13px;
+  display:flex;flex-direction:column;gap:5px;background:#fff;
 }
-.pill-radio input{margin-right:6px;}
-.pill-radio label.checked{border-color:var(--accent);background:var(--accent-light);}
-.pill-radio .title{font-weight:700;color:var(--navy);}
-.pill-radio .hint{font-size:11.5px;color:var(--text-mute);}
+.pill-radio input{accent-color:var(--primary);width:16px;height:16px;margin-bottom:4px;}
+.pill-radio label.checked{border-color:var(--primary);background:var(--primary-soft);}
+.pill-radio .title{font-weight:700;color:var(--ink);font-size:13.5px;}
+.pill-radio .hint{font-size:12px;color:var(--ink-soft);line-height:1.5;}
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:12px 0;}
-.stat{background:var(--grey-bg);border-radius:8px;padding:12px 14px;}
-.stat .num{font-size:22px;font-weight:800;color:var(--navy);}
-.stat .lbl{font-size:11.5px;color:var(--text-mute);}
+.stat{background:var(--bg);border-radius:12px;padding:14px 16px;}
+.stat .num{font-size:22px;font-weight:800;color:var(--ink);}
+.stat .lbl{font-size:11.5px;color:var(--ink-soft);margin-top:3px;font-weight:600;}
 .util-bar{height:8px;border-radius:4px;background:#EAEAEA;overflow:hidden;margin-top:4px;}
-.util-bar span{display:block;height:100%;background:var(--accent);}
-.util-bar span.high{background:var(--danger);}
-.container-card{border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px;background:#fff;}
+.util-bar span{display:block;height:100%;background:var(--primary);}
+.util-bar span.high{background:var(--red);}
+.container-card{border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;background:#fff;}
 .container-card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.container-card .head .name{font-weight:700;color:var(--navy);font-size:14.5px;}
+.container-card .head .name{font-weight:700;color:var(--ink);font-size:14.5px;}
 .viz{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;}
-.viz svg{border:1px solid var(--border);border-radius:6px;background:#FCFCFD;}
-.legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-mute);}
-.legend-swatch{width:10px;height:10px;border-radius:2px;display:inline-block;}
+.viz svg{border:1px solid var(--border);border-radius:10px;background:#FBFCFE;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);}
+.legend-swatch{width:10px;height:10px;border-radius:3px;display:inline-block;}
 .tag-row{display:flex;gap:6px;flex-wrap:wrap;}
-.discretionary-card{border:1px solid #F0D9A6;background:var(--warn-bg);border-radius:8px;padding:12px 14px;margin-bottom:10px;}
-.discretionary-card .reason{font-size:12px;color:#8a5b00;margin:4px 0 8px;}
+.discretionary-card{border:1px solid var(--amber-soft-border);background:var(--amber-soft);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+.discretionary-card .reason{font-size:12px;color:#7A5208;margin:4px 0 8px;}
 .toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;}
-.footer-note{font-size:11.5px;color:var(--text-mute);margin-top:8px;}
+.footer-note{font-size:11.5px;color:var(--ink-soft);margin-top:8px;}
 .modal-backdrop{
-  position:fixed;inset:0;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center;z-index:50;
+  position:fixed;inset:0;background:rgba(22,33,60,0.45);display:none;align-items:center;justify-content:center;z-index:50;
 }
 .modal-backdrop.open{display:flex;}
-.modal{background:#fff;border-radius:10px;padding:22px 24px;width:520px;max-width:92vw;max-height:88vh;overflow:auto;}
-.modal h3{margin-top:0;color:var(--navy);}
+.modal{background:#fff;border-radius:14px;padding:24px 26px;width:520px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,0.2);}
+.modal h3{margin-top:0;color:var(--ink);font-size:17px;}
 .toast{
-  position:fixed;bottom:22px;right:22px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:8px;
+  position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;
   font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,0.2);display:none;z-index:60;max-width:360px;
 }
 .toast.show{display:block;}
 .check-col{width:34px;text-align:center;}
-.error-list{background:#FCE8E6;border:1px solid #F1B4AE;border-radius:8px;padding:12px 14px;color:#8a2117;font-size:12.5px;}
+.error-list{background:var(--red-soft);border:1px solid #F1B4AE;border-radius:10px;padding:13px 15px;color:#8a2117;font-size:12.5px;}
 
 /* 상단 고정 액션 바 — 다음/이전 등 핵심 버튼은 스크롤과 무관하게 항상 화면 위쪽에 보이도록 */
 .action-bar{
-  position:sticky;top:0;z-index:20;background:#fff;border:1px solid var(--border);border-radius:10px;
+  position:sticky;top:0;z-index:20;background:#fff;border:1px solid var(--border);border-radius:12px;
   padding:12px 18px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,0.06);
   display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
 }
-.action-bar-info{font-size:12.5px;color:var(--text-mute);}
+.action-bar-info{font-size:12.5px;color:var(--ink-soft);}
 .action-bar-btns{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* 하단 액션 바 — 각 단계 내용이 끝나는 지점에도 똑같은 버튼을 한 번 더 보여줘서,
+   위로 스크롤해 올라가지 않고도 바로 다음 단계로 넘어갈 수 있게 한다. */
+.action-bar-bottom{position:static;margin-top:20px;margin-bottom:0;}
 
 /* 검색/필터 바 */
 .filter-bar{margin:12px 0;}
 .filter-bar input[type="text"], .filter-bar select{
-  border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:var(--text);
+  border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);
 }
 .filter-bar input[type="text"]{flex:1;min-width:200px;}
 .filter-bar select{min-width:170px;}
 
 /* 파일 선택을 트리거하는 버튼처럼 보이는 라벨 (엑셀 추가 / 백업 불러오기) */
 .ghost-file{
-  display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;
-  padding:8px 16px;cursor:pointer;font-weight:600;font-size:13px;color:var(--text-mute);background:#fff;
+  display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:9px;
+  padding:9px 16px;cursor:pointer;font-weight:700;font-size:13px;color:var(--ink-soft);background:#fff;
 }
-.ghost-file.small{padding:5px 12px;font-size:12px;}
-.ghost-file:hover{border-color:var(--accent);color:var(--accent);}
+.ghost-file.small{padding:6px 12px;font-size:12px;}
+.ghost-file:hover{border-color:var(--primary);color:var(--primary);}
 
 /* 페이지네이션 */
-.pagination{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px;font-size:12.5px;color:var(--text-mute);}
+.pagination{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px;font-size:12.5px;color:var(--ink-soft);}
 
 /* 결과 화면의 컨테이너 카드 — 기본은 접혀 있고 헤더를 누르면 펼쳐지는 아코디언 */
 .bin-card .head{cursor:pointer;user-select:none;}
 .bin-card .head:hover{opacity:0.85;}
-.bin-card .chevron{display:inline-block;color:var(--text-mute);font-size:11px;margin-left:6px;}
-.bin-card .item-count{font-size:11.5px;color:var(--text-mute);}
-.linklike{background:none;border:none;color:var(--accent);text-decoration:underline;cursor:pointer;font-size:inherit;font-family:inherit;padding:0;}
-.satisfaction-btn{background:#fff;border:1px solid var(--border);color:var(--text-mute);border-radius:6px;padding:8px 16px;font-size:14px;}
-.satisfaction-btn.active[data-value="만족"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:700;}
-.satisfaction-btn.active[data-value="불만족"]{background:#F5E6E6;border-color:var(--danger);color:var(--danger);font-weight:700;}
+.bin-card .chevron{display:inline-block;color:var(--ink-soft);font-size:11px;margin-left:6px;}
+.bin-card .item-count{font-size:11.5px;color:var(--ink-soft);}
+.linklike{background:none;border:none;color:var(--primary);text-decoration:underline;cursor:pointer;font-size:inherit;font-family:inherit;padding:0;}
+.satisfaction-btn{background:#fff;border:1px solid var(--border);color:var(--ink-soft);border-radius:9px;padding:9px 18px;font-size:14px;font-weight:600;}
+.satisfaction-btn.active[data-value="만족"]{background:var(--green-soft);border-color:var(--green);color:var(--green);font-weight:700;}
+.satisfaction-btn.active[data-value="불만족"]{background:var(--red-soft);border-color:var(--red);color:var(--red);font-weight:700;}
 
 </style>
 </head>
 <body>
 
 <header class="topbar">
-  <div>
-    <h1>컨테이너 적재 계산 (CLP) 프로토타입</h1>
-    <div class="sub">공용 데이터베이스 연동 버전 · 등록한 제품은 다른 사용자와 공유됩니다</div>
+  <div class="brand">
+    <div class="mark">C</div>
+    <div>
+      <h1>컨테이너 적재 계산 (CLP) 프로토타입</h1>
+      <div class="sub">공용 데이터베이스 연동 버전 · 등록한 제품은 다른 사용자와 공유됩니다</div>
+    </div>
   </div>
   <div class="sub">v0.2</div>
 </header>
@@ -270,6 +292,15 @@ table tbody tr:hover{background:var(--accent-light);}
       </div>
 
       <div class="card">
+        <h2>FR(플랫랙) 사용 최소화</h2>
+        <p class="desc">위에서 고른 기준과 함께 적용되는 옵션입니다. 켜두면 같은 기준 안에서 FR 컨테이너를 가장 적게 쓰는 조합을 먼저 보여줍니다. FR은 비용이 높아 가급적 줄이고 싶을 때 사용하세요.</p>
+        <div class="pill-radio" id="minfr-pills">
+          <label data-minfr="no"><input type="radio" name="minfr" /><span class="title">사용 안 함</span><span class="hint">위에서 고른 기준만 그대로 적용합니다</span></label>
+          <label data-minfr="yes"><input type="radio" name="minfr" /><span class="title">사용</span><span class="hint">FR 컨테이너 수가 적은 조합을 먼저 두고, 그 안에서 위 기준으로 순위를 매깁니다</span></label>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>회전(눕혀서) 적재 허용</h2>
         <p class="desc">허용하면 화물을 눕히거나 세우는 방향도 함께 검토해 적재율이 개선될 수 있습니다. 화물별로 회전 가능 여부가 다르면 "허용 안 함"을 선택하세요.</p>
         <div class="pill-radio" id="rotate-pills">
@@ -295,6 +326,9 @@ table tbody tr:hover{background:var(--accent-light);}
         <div id="result-content"></div>
       </div>
     </div>
+
+    <!-- 하단 액션 바 — 위 상단 고정 바와 항상 같은 내용을 보여준다 (renderActionBar가 둘 다 갱신) -->
+    <div class="action-bar action-bar-bottom" id="action-bar-bottom"></div>
 
   </section>
 
@@ -461,6 +495,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
 </script>
 <script>
+
 /* =========================================================================
    CLP 적재 계산 프로토타입 — 클라이언트 사이드 전용 (서버/DB 없음)
    상태는 메모리에만 유지되며, 새로고침 시 사라집니다.
@@ -516,7 +551,8 @@ let reviewBatchIds = []; // 가장 최근 업로드로 새로 추가된 제품 i
 // 계산용 업로드(handleQuickCalcUpload)가 새로 일어날 때마다 직전 내용을 비우고 새로 담는다.
 let lastCalcSourceFiles = [];
 let calcSelectionQty = {}; // productId -> 계산에 포함할 수량
-let calcMode = "count";    // count | rate
+let calcMode = "count";    // count | rate — 옵션 순위를 매기는 기본 기준(둘 중 하나)
+let calcMinFR = true;      // true면 위 기준 안에서 FR(플랫랙) 사용이 적은 옵션을 우선한다(기준과 병행 가능한 별도 옵션) — 기본값: 사용(최소화)
 let calcRotateAllowed = false; // 이번 계산에 포함된 화물 전체에 대해 회전(눕혀서) 적재를 허용할지 여부
 
 let pairingResult = null;  // step1 결과 (autoPairs, discretionary, singles, oversize, errors)
@@ -1384,6 +1420,14 @@ function setCalcMode(mode) {
   document.querySelectorAll("#mode-pills label").forEach((l) => l.classList.toggle("checked", l.dataset.mode === mode));
 }
 
+// "FR 최소화"는 "컨테이너 개수 최소화"/"공간 활용도 우선"과 양자택일이 아니라, 그 위에 함께 켤
+// 수 있는 별도 옵션이다 — 예: "개수 최소화 + FR 최소화"도 가능하고 "활용도 우선 + FR 최소화"도
+// 가능하다. 그래서 calcMode(2종류)와 별개의 독립된 플래그로 관리한다.
+function setCalcMinFR(on) {
+  calcMinFR = on;
+  document.querySelectorAll("#minfr-pills label").forEach((l) => l.classList.toggle("checked", (l.dataset.minfr === "yes") === on));
+}
+
 function setCalcRotate(allow) {
   calcRotateAllowed = allow;
   document.querySelectorAll("#rotate-pills label").forEach((l) => l.classList.toggle("checked", (l.dataset.rotate === "yes") === allow));
@@ -1891,16 +1935,32 @@ function scoreStrategy(bins) {
   return { count: bins.length, avgUtil, byType, byTypeLabel };
 }
 
+// 초과화물(OT/FR) 전용 컨테이너를 채우는 함수. 화물 하나하나는 classifyUnits에서 "최소한
+// 들어가는 타입"(oversizeType, 예: 20FR 혹은 40FR)이 이미 정해져 있지만, 여기서는 그 타입
+// 하나로만 따로따로 묶지 않고 같은 계열(OT: 20OT/40OT, FR: 20FR/40FR) 안에서 더 작은 타입을
+// 먼저 시도하되 이미 열린 컨테이너에 다른 화물이 더 들어갈 수 있으면 거기부터 채운다(=
+// binPackGeneric과 동일한 방식). 예를 들어 20FR 하나로 충분한 화물과 40FR이 필요한 화물이
+// 함께 있을 때, 그 두 화물을 합쳐도 40FR 하나에 다 들어간다면 40FR 1개로 끝내고 20FR은 아예
+// 열지 않는다 — 이전에는 타입별로 무조건 따로 컨테이너를 열어 FR을 불필요하게 더 많이 썼다.
 function binPackOversize(oversizeUnits, mode) {
-  const byType = {};
-  oversizeUnits.forEach((u) => { (byType[u.oversizeType] = byType[u.oversizeType] || []).push(u); });
+  const FAMILIES = { OT: ["20OT", "40OT"], FR: ["20FR", "40FR"] };
+  const byFamily = {};
+  oversizeUnits.forEach((u) => {
+    const fam = (u.oversizeType === "20OT" || u.oversizeType === "40OT") ? "OT" : "FR";
+    (byFamily[fam] = byFamily[fam] || []).push(u);
+  });
   const result = {};
-  Object.entries(byType).forEach(([type, list]) => {
+  Object.entries(byFamily).forEach(([fam, list]) => {
     const asLoadUnits = list.map((u) => ({ orientations: unitOrientations(u.l, u.w, u.h, u.freeRotate), weight: u.weight, tier: "1단", items: [u], desc: u.desc }));
-    result[type] = binPack(asLoadUnits, type, mode);
+    const { bins } = binPackGeneric(asLoadUnits, mode, FAMILIES[fam], false);
+    bins.forEach((bin) => { (result[bin.type] = result[bin.type] || []).push(bin); });
   });
   return result;
 }
+
+// 어떤 컨테이너 묶음(bins) 안에 FR(20FR/40FR) 컨테이너가 몇 개 있는지 센다.
+// "FR 최소화" 순위 기준(아래 runStep2 참고)에 쓰인다.
+function countFRBins(bins) { return bins.filter((b) => b.type === "20FR" || b.type === "40FR").length; }
 
 // 세 가지 배치 전략 후보. 사용자가 컨테이너 타입을 직접 고르지 않는 대신,
 // 시스템이 아래 조합을 모두 계산해 비교한 뒤 순위를 매겨 제시한다.
@@ -1941,6 +2001,7 @@ function runStep2() {
 
   // 초과화물(OT/FR)만 따로 배치한 결과 — "분리형" 옵션(표준 3가지 전략)에서 공통으로 덧붙여 보여줄 때 사용.
   sharedOversizeBins = binPackOversize(oversize, calcMode);
+  const sharedOversizeFRCount = Object.values(sharedOversizeBins).reduce((s, bins) => s + countFRBins(bins), 0);
 
   // 품목별 색상은 표준 컨테이너 3가지 전략 + 초과화물까지 이번 계산 전체를 통틀어 한 번만
   // 배정한다 — 그래야 1순위/2순위/3순위 옵션을 오가며 봐도, 그리고 OT/FR 컨테이너를 함께
@@ -1949,7 +2010,9 @@ function runStep2() {
 
   const computed = STRATEGY_DEFS.map((def) => {
     const { bins, unplaceable } = binPackGeneric(loadUnits, calcMode, def.allowedTypes, def.dynamic);
-    return { ...def, bins, unplaceable, score: scoreStrategy(bins) };
+    // "분리형" 옵션은 표준 컨테이너(bins)에는 FR이 전혀 없고, 초과화물용 FR은 모든 분리형
+    // 옵션이 공통으로 같은 sharedOversizeBins를 그대로 덧붙여 쓰므로 FR 개수도 동일하다.
+    return { ...def, bins, unplaceable, score: { ...scoreStrategy(bins), frCount: sharedOversizeFRCount } };
   });
 
   // "통합형" 옵션: 초과화물이 있을 때만 계산한다. 표준화물과 초과화물을 분리하지 않고,
@@ -1993,13 +2056,18 @@ function runStep2() {
     ];
     combinedDefs.forEach((def) => {
       const { bins, unplaceable } = binPackGeneric(combinedLoadUnits, calcMode, def.allowedTypes, def.dynamic);
-      computed.push({ ...def, bins, unplaceable, score: scoreStrategy(bins) });
+      // "통합형" 옵션은 초과화물이 bins 안에 함께 들어있으므로, 그 안의 FR 개수를 직접 센다.
+      computed.push({ ...def, bins, unplaceable, score: { ...scoreStrategy(bins), frCount: countFRBins(bins) } });
     });
   }
 
-  // 순위: "개수 최소화" 모드는 컨테이너 수가 적을수록, "적재율 최적화" 모드는 평균 활용도가 높을수록 우선.
-  // 동점일 경우 반대 지표로 한 번 더 비교한다.
+  // 순위: "FR 최소화"가 켜져 있으면 무엇보다 먼저 FR(20FR/40FR) 컨테이너 사용 개수가 적은
+  // 옵션을 우선한다(FR이 비싸서 가급적 쓰지 않으려는 요청 반영) — 이건 "개수 최소화"/
+  // "적재율 최적화"와 양자택일이 아니라 그 위에 함께 켤 수 있는 별도 기준이라, 먼저 FR
+  // 개수로 가른 다음, 그래도 같으면 원래 선택한 기준(개수 또는 활용도)으로 한 번 더 비교한다.
+  // FR 최소화가 꺼져 있으면 이전과 동일하게 그 기준 하나로만 비교한다.
   computed.sort((a, b) => {
+    if (calcMinFR && a.score.frCount !== b.score.frCount) return a.score.frCount - b.score.frCount;
     if (calcMode === "count") {
       if (a.score.count !== b.score.count) return a.score.count - b.score.count;
       return b.score.avgUtil - a.score.avgUtil;
@@ -2036,15 +2104,17 @@ function renderStepper() {
 // 화면 위쪽에 고정해, 데이터를 다 훑지 않아도 바로 다음 단계로 넘어갈 수 있게 한다.
 function renderActionBar() {
   const bar = document.getElementById("action-bar");
-  if (!bar) return;
+  const barBottom = document.getElementById("action-bar-bottom");
+  if (!bar && !barBottom) return;
 
+  let html = "";
   if (calcStage === "select") {
     const n = Object.keys(calcSelectionQty).length;
     const totalQty = Object.values(calcSelectionQty).reduce((a, b) => a + b, 0);
     if (selectView === "upload") {
-      bar.innerHTML = `<div class="action-bar-info">패킹리스트를 업로드하면 자동으로 인식 결과를 보여드립니다</div><div class="action-bar-btns"></div>`;
+      html = `<div class="action-bar-info">패킹리스트를 업로드하면 자동으로 인식 결과를 보여드립니다</div><div class="action-bar-btns"></div>`;
     } else if (selectView === "manual") {
-      bar.innerHTML = `
+      html = `
         <div class="action-bar-info">${n > 0 ? `선택 ${fmtNum(n)}종 · 총 ${fmtNum(totalQty)}개` : "계산할 제품을 선택하세요"}</div>
         <div class="action-bar-btns">
           <button class="secondary small" data-action="select-all">전체 선택</button>
@@ -2052,28 +2122,28 @@ function renderActionBar() {
           <button data-action="to-conditions" ${n === 0 ? "disabled" : ""}>다음: 계산 조건 설정 →</button>
         </div>`;
     } else { // review
-      bar.innerHTML = `
+      html = `
         <div class="action-bar-info">${n > 0 ? `인식된 화물 ${fmtNum(n)}종 · 총 ${fmtNum(totalQty)}개` : "인식된 화물이 없습니다"}</div>
         <div class="action-bar-btns">
           <button data-action="to-conditions" ${n === 0 ? "disabled" : ""}>다음: 계산 조건 설정 →</button>
         </div>`;
     }
   } else if (calcStage === "conditions") {
-    bar.innerHTML = `
+    html = `
       <div class="action-bar-info">최적화 기준과 회전 허용 여부를 정하세요</div>
       <div class="action-bar-btns">
         <button class="ghost" data-action="back-select">← 이전</button>
         <button data-action="to-review">다음: 적재 조합 계산 →</button>
       </div>`;
   } else if (calcStage === "review") {
-    bar.innerHTML = `
+    html = `
       <div class="action-bar-info">재량 판단이 필요한 조합만 확인하면 됩니다</div>
       <div class="action-bar-btns">
         <button class="ghost" data-action="back-conditions">← 이전</button>
         <button data-action="to-result">다음: 컨테이너 배치 확정 →</button>
       </div>`;
   } else if (calcStage === "result") {
-    bar.innerHTML = `
+    html = `
       <div class="action-bar-info">옵션 카드를 눌러 다른 배치안을 비교해볼 수 있습니다</div>
       <div class="action-bar-btns">
         <button class="ghost" data-action="back-review">← 조합 확인으로</button>
@@ -2082,6 +2152,11 @@ function renderActionBar() {
         <button class="ghost" data-action="restart">새 계산 시작</button>
       </div>`;
   }
+
+  // 상단(고정)과 하단(각 단계 내용이 끝나는 지점) 두 곳에 똑같은 버튼을 보여준다 —
+  // 위로 다시 스크롤하지 않고도 아래에서 바로 다음 단계로 넘어갈 수 있게.
+  if (bar) bar.innerHTML = html;
+  if (barBottom) barBottom.innerHTML = html;
 }
 
 /* ---- 결과 시각화 & 렌더 ---- */
@@ -2150,11 +2225,11 @@ function containerVizSvg(bin) {
     const label = (noLabel ? `No.${escapeHtml(noLabel)} ` : "") + (isTwoTier ? `${escapeHtml(pl.desc)} [2단]` : escapeHtml(pl.desc)) + (rowRotated ? " ↻" : "");
     rects += `<g>
       ${fillMarkup}
-      <text x="${x + ww / 2}" y="${y + hh / 2}" font-size="9" fill="#fff" text-anchor="middle" dominant-baseline="middle" stroke="#1F3864" stroke-width="2" paint-order="stroke">${w > 40 ? label.slice(0, Math.floor(w / 6)) : ""}</text>
+      <text x="${x + ww / 2}" y="${y + hh / 2}" font-size="9" fill="#fff" text-anchor="middle" dominant-baseline="middle" stroke="#16213C" stroke-width="2" paint-order="stroke">${w > 40 ? label.slice(0, Math.floor(w / 6)) : ""}</text>
     </g>`;
   });
   return `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
-    <rect x="10" y="10" width="${bin.spec.L * scale}" height="${bin.spec.W * scale}" fill="none" stroke="#1F3864" stroke-width="2"/>
+    <rect x="10" y="10" width="${bin.spec.L * scale}" height="${bin.spec.W * scale}" fill="none" stroke="#16213C" stroke-width="2"/>
     ${rects}
   </svg>`;
 }
@@ -2236,7 +2311,9 @@ function renderResult() {
   const ovLabel = oversizeSummaryLabel();
   const hasCombined = calcStrategies.some((s) => s.combined);
 
-  let html = `<p class="desc">선택한 제품·수량에 대해 컨테이너 배치 옵션을 계산해 ${calcMode === "count" ? "컨테이너 개수가 적은" : "평균 적재율이 높은"} 순으로 순위를 매겼습니다. 카드를 눌러 다른 옵션의 상세 배치를 확인할 수 있습니다.</p>`;
+  const baseCriterionLabel = calcMode === "count" ? "컨테이너 개수가 적은" : "평균 적재율이 높은";
+  const rankCriterionLabel = calcMinFR ? `FR(플랫랙) 컨테이너를 가장 적게 쓰는 옵션을 먼저 두고, 그다음 ${baseCriterionLabel}` : baseCriterionLabel;
+  let html = `<p class="desc">선택한 제품·수량에 대해 컨테이너 배치 옵션을 계산해 ${rankCriterionLabel} 순으로 순위를 매겼습니다. 카드를 눌러 다른 옵션의 상세 배치를 확인할 수 있습니다.</p>`;
   if (totalOversize > 0) {
     html += `<p class="desc">※ 표준화물(20GP/40HC)만으로 계산한 "분리형" 옵션에는 초과화물용 <strong>${ovLabel}</strong>이(가) 별도로 추가됩니다${hasCombined ? `. 반대로 "통합 배치" 옵션은 표준화물과 초과화물을 같은 컨테이너에 함께 실어, 분리형보다 컨테이너 총수가 줄어드는지 함께 비교합니다.` : "."} 이번 계산에서 초과화물만 따로 실을 경우 총 ${totalOversize}개가 필요합니다.</p>`;
   }
@@ -2247,7 +2324,7 @@ function renderResult() {
     const total = s.combined ? s.score.count : s.score.count + totalOversize;
     const totalLbl = s.combined ? "총 컨테이너 (통합 배치)" : `총 컨테이너 (표준 ${s.score.count} + OT/FR ${totalOversize})`;
     const compositionLbl = s.combined ? `컨테이너 구성: ${s.score.byTypeLabel}` : `표준 컨테이너 구성: ${s.score.byTypeLabel}${ovLabel ? `<br>+ 초과화물용(별도): ${ovLabel}` : ""}`;
-    html += `<div class="container-card" style="flex:1;min-width:260px;cursor:pointer;${selected ? "border-color:#2E74B5;box-shadow:0 0 0 2px #DDEBF7;" : ""}" onclick="selectStrategy('${s.key}')">
+    html += `<div class="container-card" style="flex:1;min-width:260px;cursor:pointer;${selected ? "border-color:#2454D6;box-shadow:0 0 0 2px #EAF0FD;" : ""}" onclick="selectStrategy('${s.key}')">
       <div class="tag-row" style="margin-bottom:8px">
         <span class="badge ${idx === 0 ? "auto" : "single"}">${RANK_LABEL[idx] || (idx + 1) + "순위"}</span>
         ${s.combined ? '<span class="badge discretionary">통합형</span>' : ""}
@@ -2400,7 +2477,7 @@ function buildTestFeedbackPayload(satisfaction, reason) {
     meta: { exportedAt: new Date().toISOString(), appLabel: "CLP 적재 계산 프로토타입", purpose: "테스트 피드백 — 실제 CLP 출력용 파일이 아닙니다" },
     feedback: { satisfaction: satisfaction || "", reason: reason || "" },
     sourceFiles: lastCalcSourceFiles, // 이번 계산으로 이어진 원본 업로드 파일(있으면) — [{name, mime, sizeBytes, dataBase64}]
-    calcConditions: { calcMode, calcRotateAllowed },
+    calcConditions: { calcMode, calcMinFR, calcRotateAllowed },
     usedProducts, // 이번 계산에 포함된 화물(사용자가 검토·수정한 최종본)
     pairing: pairingResult ? {
       errors: pairingResult.errors.map((e) => ({ desc: e.u.desc, reason: e.reason })),
@@ -2515,10 +2592,12 @@ function initEvents() {
   document.getElementById("calc-select-project-filter").addEventListener("change", (e) => { calcSelectProjectFilter = e.target.value; calcSelectPage = 1; renderCalcSelectTable(); });
 
   document.querySelectorAll("#mode-pills label").forEach((l) => l.addEventListener("click", () => setCalcMode(l.dataset.mode)));
+  document.querySelectorAll("#minfr-pills label").forEach((l) => l.addEventListener("click", () => setCalcMinFR(l.dataset.minfr === "yes")));
   document.querySelectorAll("#rotate-pills label").forEach((l) => l.addEventListener("click", () => setCalcRotate(l.dataset.rotate === "yes")));
 
   // 액션 바 버튼은 단계마다 새로 그려지므로, 개별 리스너 대신 위임 방식으로 한 번만 연결한다.
-  document.getElementById("action-bar").addEventListener("click", (e) => {
+  // 상단 고정 바와 하단(각 단계 끝) 바 모두 같은 버튼을 보여주므로, 두 곳 모두에 동일하게 연결한다.
+  function handleActionBarClick(e) {
     const btn = e.target.closest("[data-action]");
     if (!btn) return;
     const action = btn.dataset.action;
@@ -2533,9 +2612,13 @@ function initEvents() {
     else if (action === "export-clp") openClpInfoModal();
     else if (action === "export-feedback") openFeedbackModal();
     else if (action === "restart") restartCalc();
-  });
+  }
+  document.getElementById("action-bar").addEventListener("click", handleActionBarClick);
+  const actionBarBottomEl = document.getElementById("action-bar-bottom");
+  if (actionBarBottomEl) actionBarBottomEl.addEventListener("click", handleActionBarClick);
 
   setCalcMode("count");
+  setCalcMinFR(true);
   setCalcRotate(false);
   renderStepper();
 }
@@ -2560,6 +2643,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!serverOk) loadDefaultProducts();
   renderProductTable();
 });
+
 
 </script>
 </body>
