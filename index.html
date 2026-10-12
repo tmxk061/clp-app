@@ -295,8 +295,8 @@ table tbody tr:hover{background:var(--primary-soft);}
         <h2>FR(플랫랙) 사용 최소화</h2>
         <p class="desc">위에서 고른 기준과 함께 적용되는 옵션입니다. 켜두면 같은 기준 안에서 FR 컨테이너를 가장 적게 쓰는 조합을 먼저 보여줍니다. FR은 비용이 높아 가급적 줄이고 싶을 때 사용하세요.</p>
         <div class="pill-radio" id="minfr-pills">
-          <label data-minfr="no"><input type="radio" name="minfr" /><span class="title">사용 안 함</span><span class="hint">위에서 고른 기준만 그대로 적용합니다</span></label>
           <label data-minfr="yes"><input type="radio" name="minfr" /><span class="title">사용</span><span class="hint">FR 컨테이너 수가 적은 조합을 먼저 두고, 그 안에서 위 기준으로 순위를 매깁니다</span></label>
+          <label data-minfr="no"><input type="radio" name="minfr" /><span class="title">사용 안 함</span><span class="hint">위에서 고른 기준만 그대로 적용합니다</span></label>
         </div>
       </div>
 
@@ -304,8 +304,8 @@ table tbody tr:hover{background:var(--primary-soft);}
         <h2>회전(눕혀서) 적재 허용</h2>
         <p class="desc">허용하면 화물을 눕히거나 세우는 방향도 함께 검토해 적재율이 개선될 수 있습니다. 화물별로 회전 가능 여부가 다르면 "허용 안 함"을 선택하세요.</p>
         <div class="pill-radio" id="rotate-pills">
-          <label data-rotate="no"><input type="radio" name="rotate" /><span class="title">허용 안 함</span><span class="hint">등록된 규격 방향 그대로만 적재 (가로·세로 90도 회전은 항상 허용)</span></label>
           <label data-rotate="yes"><input type="radio" name="rotate" /><span class="title">허용</span><span class="hint">면을 바꿔서 넣는 방향도 함께 검토</span></label>
+          <label data-rotate="no"><input type="radio" name="rotate" /><span class="title">허용 안 함</span><span class="hint">등록된 규격 방향 그대로만 적재 (가로·세로 90도 회전은 항상 허용)</span></label>
         </div>
       </div>
     </div>
@@ -495,7 +495,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
 </script>
 <script>
-
 /* =========================================================================
    CLP 적재 계산 프로토타입 — 클라이언트 사이드 전용 (서버/DB 없음)
    상태는 메모리에만 유지되며, 새로고침 시 사라집니다.
@@ -553,7 +552,7 @@ let lastCalcSourceFiles = [];
 let calcSelectionQty = {}; // productId -> 계산에 포함할 수량
 let calcMode = "count";    // count | rate — 옵션 순위를 매기는 기본 기준(둘 중 하나)
 let calcMinFR = true;      // true면 위 기준 안에서 FR(플랫랙) 사용이 적은 옵션을 우선한다(기준과 병행 가능한 별도 옵션) — 기본값: 사용(최소화)
-let calcRotateAllowed = false; // 이번 계산에 포함된 화물 전체에 대해 회전(눕혀서) 적재를 허용할지 여부
+let calcRotateAllowed = true; // 이번 계산에 포함된 화물 전체에 대해 회전(눕혀서) 적재를 허용할지 여부 — 기본값: 허용
 
 let pairingResult = null;  // step1 결과 (autoPairs, discretionary, singles, oversize, errors)
 let discretionaryChoice = {}; // pairId -> true(2단 적용) / false(1단 분리)
@@ -1417,7 +1416,15 @@ function renderSelectReviewTable() {
 
 function setCalcMode(mode) {
   calcMode = mode;
-  document.querySelectorAll("#mode-pills label").forEach((l) => l.classList.toggle("checked", l.dataset.mode === mode));
+  document.querySelectorAll("#mode-pills label").forEach((l) => {
+    const checked = l.dataset.mode === mode;
+    l.classList.toggle("checked", checked);
+    // 클릭 시에는 브라우저가 알아서 라디오 버튼을 체크해주지만, 코드로 기본값을 세팅하는
+    // 시점(페이지 첫 진입 등)에는 input의 checked 속성을 직접 맞춰줘야 동그라미가 비어
+    // 보이지 않는다(카드 테두리 강조는 되는데 라디오 버튼만 안 채워져 보이던 문제의 원인).
+    const input = l.querySelector("input[type=radio]");
+    if (input) input.checked = checked;
+  });
 }
 
 // "FR 최소화"는 "컨테이너 개수 최소화"/"공간 활용도 우선"과 양자택일이 아니라, 그 위에 함께 켤
@@ -1425,12 +1432,22 @@ function setCalcMode(mode) {
 // 가능하다. 그래서 calcMode(2종류)와 별개의 독립된 플래그로 관리한다.
 function setCalcMinFR(on) {
   calcMinFR = on;
-  document.querySelectorAll("#minfr-pills label").forEach((l) => l.classList.toggle("checked", (l.dataset.minfr === "yes") === on));
+  document.querySelectorAll("#minfr-pills label").forEach((l) => {
+    const checked = (l.dataset.minfr === "yes") === on;
+    l.classList.toggle("checked", checked);
+    const input = l.querySelector("input[type=radio]");
+    if (input) input.checked = checked;
+  });
 }
 
 function setCalcRotate(allow) {
   calcRotateAllowed = allow;
-  document.querySelectorAll("#rotate-pills label").forEach((l) => l.classList.toggle("checked", (l.dataset.rotate === "yes") === allow));
+  document.querySelectorAll("#rotate-pills label").forEach((l) => {
+    const checked = (l.dataset.rotate === "yes") === allow;
+    l.classList.toggle("checked", checked);
+    const input = l.querySelector("input[type=radio]");
+    if (input) input.checked = checked;
+  });
 }
 
 /* ---- 화물 단위 전개 ---- */
@@ -1920,6 +1937,64 @@ function binPackGeneric(loadUnits, mode, allowedTypes, dynamicTypeChoice) {
   return { bins, unplaceable };
 }
 
+// sharedOversizeBins(공용 초과화물 배치)를 전략별로 독립적으로 "자투리 채우기"에 써볼 수
+// 있도록 깊은 복사한다 — 원본을 건드리면 다른 전략/화면에 영향을 주므로 절대 직접 수정하지 않는다.
+function cloneOversizeBinsForOverflow(sharedBins) {
+  const cloned = {};
+  Object.entries(sharedBins).forEach(([type, binsOfType]) => {
+    cloned[type] = binsOfType.map((b) => {
+      const base = { type: b.type, index: b.index, spec: b.spec, placements: b.placements.slice(), usedWeight: b.usedWeight };
+      // FR은 rows(행) 기반, OT는 일반 컨테이너와 같은 freeRects 기반 — 구조가 달라 각각 복사해야 한다.
+      return isFRType(b.type)
+        ? { ...base, rows: b.rows.map((r) => ({ ...r })), usedLength: b.usedLength }
+        : { ...base, freeRects: b.freeRects.map((r) => ({ ...r })) };
+    });
+  });
+  return cloned;
+}
+
+// 표준화물(20GP/40HC) 패킹이 끝난 뒤, 가장 마지막에 연(= 보통 가장 휑하게 채워진) 컨테이너를
+// 통째로 비울 수 있는지 시도한다 — 안의 화물 "전부"가 이미 열려 있는 OT/FR의 남는 공간에
+// 들어갈 때만 옮기고, 하나라도 안 들어가면 그 컨테이너도, 그 앞 컨테이너도 건드리지 않는다
+// (부분 이동 없음, 새 OT/FR을 여는 일도 없음 — 기존 여유 공간만 사용).
+// 예: BOILER BODY 때문에 이미 FR 1개가 확정돼 있는데, 자투리 화물 한두 개 때문에 40HC를
+// 하나 더 여는 대신 그 FR의 남는 길이·중량에 먼저 채워 넣는다.
+function consolidateTrailingBinIntoOverflow(bins, overflowBinsFlat) {
+  if (!overflowBinsFlat || !overflowBinsFlat.length) return;
+  while (bins.length) {
+    const candidate = bins[bins.length - 1];
+    // 실패하면 아무것도 바꾸지 않도록, 사본에 먼저 전부 넣어보고 성공할 때만 실제로 반영한다.
+    // FR(rows 기반)과 OT(freeRects 기반)는 내부 구조가 달라 각각 맞는 방식으로 복사한다.
+    const trialBins = overflowBinsFlat.map((ob) => {
+      const base = { type: ob.type, spec: ob.spec, placements: ob.placements.slice(), usedWeight: ob.usedWeight };
+      return isFRType(ob.type)
+        ? { ...base, rows: ob.rows.map((r) => ({ ...r })), usedLength: ob.usedLength }
+        : { ...base, freeRects: ob.freeRects.map((r) => ({ ...r })) };
+    });
+    let ok = true;
+    for (const p of candidate.placements) {
+      let placed = false;
+      for (const tb of trialBins) {
+        if (tb.usedWeight + p.weight > tb.spec.maxWeight + EPS) continue;
+        const useFR = isFRType(tb.type);
+        const place = useFR ? findPlacementFR : findPlacement;
+        const commit = useFR ? commitPlacementFR : commitPlacement;
+        const plan = place(tb, p); // placement 객체는 원래 loadUnit의 orientations/weight를 그대로 갖고 있다.
+        if (plan) { commit(tb, plan, p); placed = true; break; }
+      }
+      if (!placed) { ok = false; break; }
+    }
+    if (!ok) break; // 마지막 컨테이너조차 다 못 옮기면 중단 — 그 앞(더 꽉 찬) 컨테이너는 시도하지 않는다.
+    trialBins.forEach((tb, idx) => {
+      const real = overflowBinsFlat[idx];
+      real.placements = tb.placements; real.usedWeight = tb.usedWeight;
+      if (isFRType(tb.type)) { real.rows = tb.rows; real.usedLength = tb.usedLength; }
+      else { real.freeRects = tb.freeRects; }
+    });
+    bins.pop(); // 전부 옮겨졌으니 이 컨테이너는 더 이상 필요 없다.
+  }
+}
+
 function scoreStrategy(bins) {
   const utils = bins.map((b) => {
     const floorArea = b.spec.L * b.spec.W;
@@ -2009,10 +2084,18 @@ function runStep2() {
   productColorMap = buildProductColorMap(loadUnits.map((u) => u.desc).concat(oversize.map((u) => u.desc)));
 
   const computed = STRATEGY_DEFS.map((def) => {
+    // 전략마다 독립적인 "자투리 채우기용" OT/FR 사본을 준비한다 — 표준화물이 남는 컨테이너
+    // 하나를 더 여는 대신, 초과화물 때문에 이미 열려 있는 OT/FR의 빈 공간부터 채워본다.
+    // 사본이라 전략끼리 서로 영향을 주지 않고, 새 OT/FR을 여는 일은 없다(기존 것만 사용).
+    const extraOversizeBins = cloneOversizeBinsForOverflow(sharedOversizeBins);
+    const overflowBinsFlat = Object.values(extraOversizeBins).flat();
     const { bins, unplaceable } = binPackGeneric(loadUnits, calcMode, def.allowedTypes, def.dynamic);
-    // "분리형" 옵션은 표준 컨테이너(bins)에는 FR이 전혀 없고, 초과화물용 FR은 모든 분리형
-    // 옵션이 공통으로 같은 sharedOversizeBins를 그대로 덧붙여 쓰므로 FR 개수도 동일하다.
-    return { ...def, bins, unplaceable, score: { ...scoreStrategy(bins), frCount: sharedOversizeFRCount } };
+    // 표준화물 패킹이 끝난 뒤, 맨 마지막(보통 가장 휑한) 컨테이너를 통째로 OT/FR의 남는
+    // 공간에 옮길 수 있는지 시도한다 — 성공하면 그 컨테이너는 아예 필요 없어진다.
+    consolidateTrailingBinIntoOverflow(bins, overflowBinsFlat);
+    // "분리형" 옵션은 표준 컨테이너(bins)에는 FR이 전혀 없고, 초과화물용 FR 개수는 모든 분리형
+    // 옵션이 동일하다(자투리 채우기는 기존 FR 안을 더 채울 뿐 개수를 늘리지 않으므로 그대로 유지).
+    return { ...def, bins, unplaceable, extraOversizeBins, score: { ...scoreStrategy(bins), frCount: sharedOversizeFRCount } };
   });
 
   // "통합형" 옵션: 초과화물이 있을 때만 계산한다. 표준화물과 초과화물을 분리하지 않고,
@@ -2353,11 +2436,14 @@ function renderResult() {
   html += current.bins.length ? current.bins.map((b) => renderBinCard(b, `${CONTAINERS[b.type].label} #${b.index}`, `${b.type}_${b.index}`)).join("") : '<div class="empty">사용된 컨테이너가 없습니다.</div>';
 
   // 통합형 옵션은 초과화물이 이미 current.bins 안에 함께 배치되어 있으므로, 분리형(표준 전략)일 때만
-  // 초과화물 전용 컨테이너를 별도 섹션으로 덧붙인다.
+  // 초과화물 전용 컨테이너를 별도 섹션으로 덧붙인다. 전략마다 자투리 표준화물을 조금씩 다르게
+  // 채워 넣었을 수 있어(컨테이너 개수는 항상 동일, 내용물만 전략별로 다를 수 있음) 전역
+  // sharedOversizeBins가 아니라 이 전략 고유의 extraOversizeBins를 사용한다.
   if (!current.combined) {
-    Object.entries(sharedOversizeBins).forEach(([type, bins]) => {
+    const ovBinsForCurrent = current.extraOversizeBins || sharedOversizeBins;
+    Object.entries(ovBinsForCurrent).forEach(([type, bins]) => {
       if (!bins.length) return;
-      html += `<h3>${CONTAINERS[type].label} 컨테이너 (초과화물, 분리형 옵션 공통)</h3>`;
+      html += `<h3>${CONTAINERS[type].label} 컨테이너 (초과화물용 — 자투리 표준화물 함께 적재 가능)</h3>`;
       html += bins.map((b) => renderBinCard(b, `${CONTAINERS[type].label} #${b.index}`, `${b.type}_${b.index}`)).join("");
     });
   }
@@ -2369,7 +2455,7 @@ function restartCalc() {
   calcStage = "select"; calcSelectionQty = {}; pairingResult = null;
   calcStrategies = []; sharedOversizeBins = {}; selectedStrategyKey = null; productColorMap = {}; expandedBins.clear();
   selectView = "upload"; reviewBatchIds = []; lastCalcSourceFiles = [];
-  setCalcRotate(false);
+  setCalcRotate(true);
   renderStepper();
 }
 
@@ -2619,7 +2705,7 @@ function initEvents() {
 
   setCalcMode("count");
   setCalcMinFR(true);
-  setCalcRotate(false);
+  setCalcRotate(true);
   renderStepper();
 }
 
@@ -2643,7 +2729,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!serverOk) loadDefaultProducts();
   renderProductTable();
 });
-
 
 </script>
 </body>
