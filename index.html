@@ -1953,46 +1953,72 @@ function cloneOversizeBinsForOverflow(sharedBins) {
   return cloned;
 }
 
-// 표준화물(20GP/40HC) 패킹이 끝난 뒤, 가장 마지막에 연(= 보통 가장 휑하게 채워진) 컨테이너를
-// 통째로 비울 수 있는지 시도한다 — 안의 화물 "전부"가 이미 열려 있는 OT/FR의 남는 공간에
-// 들어갈 때만 옮기고, 하나라도 안 들어가면 그 컨테이너도, 그 앞 컨테이너도 건드리지 않는다
-// (부분 이동 없음, 새 OT/FR을 여는 일도 없음 — 기존 여유 공간만 사용).
-// 예: BOILER BODY 때문에 이미 FR 1개가 확정돼 있는데, 자투리 화물 한두 개 때문에 40HC를
-// 하나 더 여는 대신 그 FR의 남는 길이·중량에 먼저 채워 넣는다.
-function consolidateTrailingBinIntoOverflow(bins, overflowBinsFlat) {
-  if (!overflowBinsFlat || !overflowBinsFlat.length) return;
-  while (bins.length) {
-    const candidate = bins[bins.length - 1];
-    // 실패하면 아무것도 바꾸지 않도록, 사본에 먼저 전부 넣어보고 성공할 때만 실제로 반영한다.
-    // FR(rows 기반)과 OT(freeRects 기반)는 내부 구조가 달라 각각 맞는 방식으로 복사한다.
-    const trialBins = overflowBinsFlat.map((ob) => {
-      const base = { type: ob.type, spec: ob.spec, placements: ob.placements.slice(), usedWeight: ob.usedWeight };
-      return isFRType(ob.type)
-        ? { ...base, rows: ob.rows.map((r) => ({ ...r })), usedLength: ob.usedLength }
-        : { ...base, freeRects: ob.freeRects.map((r) => ({ ...r })) };
-    });
-    let ok = true;
-    for (const p of candidate.placements) {
-      let placed = false;
-      for (const tb of trialBins) {
-        if (tb.usedWeight + p.weight > tb.spec.maxWeight + EPS) continue;
+// overflowBinsFlat(OT/FR 사본 배열)을 또 한 번 복사한다 — "이 화물을 옮기면 정말 도움이
+// 되는지" 시험해볼 때, 실패해도 원본이 더럽혀지지 않도록 쓴다. FR은 rows(행) 기반, OT는
+// 일반 컨테이너와 같은 freeRects 기반이라 구조가 달라 각각 복사해야 한다.
+function cloneFlatOverflowBins(flatBins) {
+  return flatBins.map((b) => {
+    const base = { type: b.type, index: b.index, spec: b.spec, placements: b.placements.slice(), usedWeight: b.usedWeight };
+    return isFRType(b.type)
+      ? { ...base, rows: b.rows.map((r) => ({ ...r })), usedLength: b.usedLength }
+      : { ...base, freeRects: b.freeRects.map((r) => ({ ...r })) };
+  });
+}
+
+// 표준화물(20GP/40HC)을 평소대로 한 번 배치해본 뒤, 그중 화물 하나를 이미 열려 있는 OT/FR의
+// 남는 공간으로 옮기면 — 그 화물이 차지하던 자리가 비면서 — 나머지 화물을 다시 묶었을 때
+// 컨테이너 수가 실제로 줄어드는지 하나씩 검토한다. 줄어들 때만 그 화물을 OT/FR로 확정해서
+// 옮기고, 나머지는 다시 짠 결과로 교체한다 — 이 과정을 더 줄일 수 있는 화물이 없을 때까지
+// 반복한다(더 줄어드는 경우가 없으면 안전하게 끝난다).
+// 예: BOILER BODY 때문에 FR 1개가 이미 확정돼 있고, 40HC 안의 화물 하나를 FR의 남는 공간으로
+// 옮기면 40HC에 자리가 비어서 20GP 하나에 담겨 있던 자투리 화물까지 그 40HC로 합쳐지는 경우
+// — 화물 하나를 옮긴 것만으로 컨테이너가 2개나 줄어들 수 있다(FR로 간 화물의 자리 + 20GP 전체).
+// 큰 화물부터 시도하는 이유: 큰 화물일수록 옮겼을 때 비는 자리도 커서, 다른 화물이 합쳐질
+// 여지가 더 많다(사용자가 직접 지적한 사례도 비교적 큰 화물이었다).
+function offloadToReduceContainers(loadUnits, mode, allowedTypes, dynamicTypeChoice, overflowBinsFlat) {
+  let remaining = loadUnits.slice();
+  let { bins, unplaceable } = binPackGeneric(remaining, mode, allowedTypes, dynamicTypeChoice);
+  if (!overflowBinsFlat || !overflowBinsFlat.length) return { bins, unplaceable };
+
+  let improved = true;
+  while (improved) {
+    improved = false;
+    const candidates = remaining.slice().sort((a, b) => nominalArea(b) - nominalArea(a));
+    for (const cand of candidates) {
+      // 1) 이 화물이 OT/FR의 남는 공간에 실제로 들어가는지부터 시험해본다(사본에).
+      const trialOverflow = cloneFlatOverflowBins(overflowBinsFlat);
+      let placedOverflow = false;
+      for (const tb of trialOverflow) {
+        if (tb.usedWeight + cand.weight > tb.spec.maxWeight + EPS) continue;
         const useFR = isFRType(tb.type);
         const place = useFR ? findPlacementFR : findPlacement;
         const commit = useFR ? commitPlacementFR : commitPlacement;
-        const plan = place(tb, p); // placement 객체는 원래 loadUnit의 orientations/weight를 그대로 갖고 있다.
-        if (plan) { commit(tb, plan, p); placed = true; break; }
+        const plan = place(tb, cand);
+        if (plan) { commit(tb, plan, cand); placedOverflow = true; break; }
       }
-      if (!placed) { ok = false; break; }
+      if (!placedOverflow) continue; // OT/FR 남는 공간에 아예 안 들어가면 다음 후보로.
+
+      // 2) 들어간다면, 이 화물을 뺀 나머지를 다시 패킹했을 때 컨테이너 수가 정말 줄어드는지 확인.
+      const reducedUnits = remaining.filter((u) => u !== cand);
+      const repacked = binPackGeneric(reducedUnits, mode, allowedTypes, dynamicTypeChoice);
+      if (repacked.unplaceable.length <= unplaceable.length && repacked.bins.length < bins.length) {
+        // 실제로 줄어들 때만 반영 — 그냥 공간이 남는다고 무조건 옮기지 않는다.
+        trialOverflow.forEach((tb, idx) => {
+          const real = overflowBinsFlat[idx];
+          real.placements = tb.placements; real.usedWeight = tb.usedWeight;
+          if (isFRType(tb.type)) { real.rows = tb.rows; real.usedLength = tb.usedLength; }
+          else { real.freeRects = tb.freeRects; }
+        });
+        remaining = reducedUnits;
+        bins = repacked.bins;
+        unplaceable = repacked.unplaceable;
+        improved = true;
+        break; // 상태가 바뀌었으니 후보 목록을 처음부터 다시 훑는다.
+      }
+      // 컨테이너 수가 안 줄면 이 시도(trialOverflow)는 버리고 다음 후보로 — 실제 overflowBinsFlat은 그대로.
     }
-    if (!ok) break; // 마지막 컨테이너조차 다 못 옮기면 중단 — 그 앞(더 꽉 찬) 컨테이너는 시도하지 않는다.
-    trialBins.forEach((tb, idx) => {
-      const real = overflowBinsFlat[idx];
-      real.placements = tb.placements; real.usedWeight = tb.usedWeight;
-      if (isFRType(tb.type)) { real.rows = tb.rows; real.usedLength = tb.usedLength; }
-      else { real.freeRects = tb.freeRects; }
-    });
-    bins.pop(); // 전부 옮겨졌으니 이 컨테이너는 더 이상 필요 없다.
   }
+  return { bins, unplaceable };
 }
 
 function scoreStrategy(bins) {
@@ -2017,6 +2043,28 @@ function scoreStrategy(bins) {
 // binPackGeneric과 동일한 방식). 예를 들어 20FR 하나로 충분한 화물과 40FR이 필요한 화물이
 // 함께 있을 때, 그 두 화물을 합쳐도 40FR 하나에 다 들어간다면 40FR 1개로 끝내고 20FR은 아예
 // 열지 않는다 — 이전에는 타입별로 무조건 따로 컨테이너를 열어 FR을 불필요하게 더 많이 썼다.
+//
+// "작은 타입 먼저" 순서만으로는, 예를 들어 20FR 하나로 끝나는 화물과 또 다른 20FR 하나로
+// 끝나는 화물이 함께 있을 때 — 사실 그 둘을 합치면 40FR 1개로 끝낼 수 있는데도 그 가능성을
+// 전혀 비교해보지 않고 20FR을 두 개 열어버리는 경우가 있었다(실제 고객 사례로 확인). 그렇다고
+// "매번 그 순간 활용도가 높아 보이는 타입을 고르는" 동적 방식은 쓰지 않는다 — 그 방식은 작은
+// 컨테이너가 당장은 활용도가 높아 보인다는 이유로 선택되어 오히려 컨테이너를 더 많이 열게
+// 되는 역효과가 있었다(통합형 옵션 검증 중 확인, combinedDefs 주석 참고). 대신 같은 화물
+// 목록을 "작은 타입 먼저"로 쌌을 때와 "큰 타입 전용"으로 쌌을 때, 두 결과를 모두 실제로
+// 만들어본 뒤 컨테이너 개수가 더 적은 쪽을 택하고, 개수가 같으면 평균 활용도가 더 높은 쪽을
+// 택한다(개수가 같을 땐 보통 작은 타입 쪽이 더 알차게 채워져 있으므로, 불필요하게 비싼 큰
+// 타입을 쓰지 않게 된다). 이렇게 결정적으로 두 결과를 비교하므로 "동적 선택"의 역효과 없이
+// 안전하게 큰 타입 통합의 이점만 얻을 수 있다.
+function avgBinUtil(bins) {
+  if (!bins.length) return 0;
+  const total = bins.reduce((s, b) => {
+    const floorArea = b.spec.L * b.spec.W;
+    const occupied = b.placements.reduce((ss, p) => ss + p.footprintL * p.footprintW, 0);
+    return s + Math.max(occupied / floorArea, b.usedWeight / b.spec.maxWeight);
+  }, 0);
+  return total / bins.length;
+}
+
 function binPackOversize(oversizeUnits, mode) {
   const FAMILIES = { OT: ["20OT", "40OT"], FR: ["20FR", "40FR"] };
   const byFamily = {};
@@ -2027,7 +2075,19 @@ function binPackOversize(oversizeUnits, mode) {
   const result = {};
   Object.entries(byFamily).forEach(([fam, list]) => {
     const asLoadUnits = list.map((u) => ({ orientations: unitOrientations(u.l, u.w, u.h, u.freeRotate), weight: u.weight, tier: "1단", items: [u], desc: u.desc }));
-    const { bins } = binPackGeneric(asLoadUnits, mode, FAMILIES[fam], false);
+    const [smallType, largeType] = FAMILIES[fam];
+    const smallFirst = binPackGeneric(asLoadUnits, mode, FAMILIES[fam], false);
+    const largeOnly = binPackGeneric(asLoadUnits, mode, [largeType], false);
+    let bins = smallFirst.bins;
+    // largeOnly가 전부 배치 가능한 경우에만 후보로 비교한다(배치 못 한 화물이 있으면 애초에 비교 대상 아님).
+    if (largeOnly.unplaceable.length === 0) {
+      if (largeOnly.bins.length < bins.length) {
+        bins = largeOnly.bins;
+      } else if (largeOnly.bins.length === bins.length && avgBinUtil(largeOnly.bins) > avgBinUtil(bins) + 1e-9) {
+        bins = largeOnly.bins;
+      }
+    }
+    bins.forEach((bin, i) => { bin.index = i + 1; });
     bins.forEach((bin) => { (result[bin.type] = result[bin.type] || []).push(bin); });
   });
   return result;
@@ -2089,10 +2149,10 @@ function runStep2() {
     // 사본이라 전략끼리 서로 영향을 주지 않고, 새 OT/FR을 여는 일은 없다(기존 것만 사용).
     const extraOversizeBins = cloneOversizeBinsForOverflow(sharedOversizeBins);
     const overflowBinsFlat = Object.values(extraOversizeBins).flat();
-    const { bins, unplaceable } = binPackGeneric(loadUnits, calcMode, def.allowedTypes, def.dynamic);
-    // 표준화물 패킹이 끝난 뒤, 맨 마지막(보통 가장 휑한) 컨테이너를 통째로 OT/FR의 남는
-    // 공간에 옮길 수 있는지 시도한다 — 성공하면 그 컨테이너는 아예 필요 없어진다.
-    consolidateTrailingBinIntoOverflow(bins, overflowBinsFlat);
+    // 표준화물을 패킹하면서, 화물 하나를 이미 열려 있는 OT/FR의 남는 공간으로 옮기는 게
+    // 실제로 컨테이너 수를 줄이는지까지 함께 검토한다(줄어들 때만 반영 — 자세한 설명은
+    // 함수 주석 참고).
+    const { bins, unplaceable } = offloadToReduceContainers(loadUnits, calcMode, def.allowedTypes, def.dynamic, overflowBinsFlat);
     // "분리형" 옵션은 표준 컨테이너(bins)에는 FR이 전혀 없고, 초과화물용 FR 개수는 모든 분리형
     // 옵션이 동일하다(자투리 채우기는 기존 FR 안을 더 채울 뿐 개수를 늘리지 않으므로 그대로 유지).
     return { ...def, bins, unplaceable, extraOversizeBins, score: { ...scoreStrategy(bins), frCount: sharedOversizeFRCount } };
